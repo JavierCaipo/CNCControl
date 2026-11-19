@@ -1,9 +1,11 @@
 import { pgTable, text, integer, boolean, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
 
+export type UserRole = 'operario' | 'supervisor' | 'gerente';
+
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
-  role: text('role').$type<'operario' | 'gerente'>().notNull(),
+  role: text('role').$type<UserRole>().notNull(),
   email: text('email').unique(),
   passwordHash: text('password_hash'),
   pinHash: text('pin_hash'),

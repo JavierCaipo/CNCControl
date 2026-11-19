@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { users } from '@/db/schema';
 import { createSessionToken, setSessionCookie } from '@/lib/auth';
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     if (!userId || !pin) {
       return NextResponse.json(
-        { error: 'Debes seleccionar un operario e ingresar el PIN.' },
+        { error: 'Debes seleccionar tu usuario e ingresar el PIN.' },
         { status: 400 }
       );
     }
@@ -23,13 +23,13 @@ export async function POST(request: Request) {
     const foundUsers = await db
       .select()
       .from(users)
-      .where(and(eq(users.id, userId), eq(users.role, 'operario'), eq(users.active, true)))
+      .where(and(eq(users.id, userId), inArray(users.role, ['operario', 'supervisor']), eq(users.active, true)))
       .limit(1);
 
     const user = foundUsers[0];
     if (!user || !user.pinHash) {
       return NextResponse.json(
-        { error: 'Operario no encontrado o sin PIN configurado.' },
+        { error: 'Usuario no encontrado o sin PIN configurado.' },
         { status: 401 }
       );
     }
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const token = await createSessionToken({
       userId: user.id,
       name: user.name,
-      role: 'operario',
+      role: user.role,
       email: user.email,
     });
 
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error en login-pin:', error);
     return NextResponse.json(
-      { error: 'Error al procesar el inicio de sesión del operario.' },
+      { error: 'Error al procesar el inicio de sesión con PIN.' },
       { status: 500 }
     );
   }

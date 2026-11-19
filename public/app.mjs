@@ -157,7 +157,16 @@ function renderCloud(state){
   $('saveStatus').textContent=state.saving||state.dirty?'Guardado en curso':state.ready?'Guardado en la nube privada':'Conectando con la nube';
   renderStatus();
 }
-sync=createCloudSync({getData:data,onStatus:renderCloud,onIdentity:user=>{if(user)$('topDate').title=`Sesión de ${user.displayName}`;},onRemote:remote=>{
+const urlParams = new URLSearchParams(window.location.search);
+const detectedMachine = urlParams.get('machine');
+let activeMachineId = detectedMachine ? detectedMachine.trim() : 'SF3015HM';
+
+if (detectedMachine) {
+  $('qrMachineBadge').hidden = false;
+  $('qrMachineName').textContent = activeMachineId;
+}
+
+sync=createCloudSync({getData:data,getMachineId:()=>activeMachineId,onStatus:renderCloud,onIdentity:user=>{if(user)$('topDate').title=`Sesión de ${user.displayName}`;},onRemote:remote=>{
   ({current,history}=remote?restore(JSON.stringify(remote)):restore(null));
   try{localStorage.setItem(CACHE_KEY,serialize(current,history));}catch{$('storageWarning').hidden=false;}
   renderAll();
@@ -199,32 +208,37 @@ async function checkAuth(){
     if(res.ok){
       const data=await res.json();
       currentUser=data.user;
-      $('userBadge').textContent=`${currentUser.role==='gerente'?'Gerente':'Operario'}: ${currentUser.name}`;
-      $('userProfile').hidden=false;
-      if($('authModal').open)$('authModal').close();
-      if(currentUser.role==='operario'&&!$('operator').value){
-        $('operator').value=currentUser.name;current.operator=currentUser.name;save();
+      const roleLabel = currentUser.role === 'gerente' ? 'Gerente' : currentUser.role === 'supervisor' ? 'Supervisor' : 'Operario';
+      $('userBadge').textContent = `${roleLabel}: ${currentUser.name}`;
+      $('userProfile').hidden = false;
+      $('manageTeamBtn').hidden = currentUser.role !== 'gerente';
+      if ($('authModal').open) $('authModal').close();
+      if ((currentUser.role === 'operario' || currentUser.role === 'supervisor') && !$('operator').value) {
+        $('operator').value = currentUser.name; current.operator = currentUser.name; save();
       }
-      sync.load();return true;
+      sync.load(); return true;
     }
-  }catch(err){console.error('Error al verificar sesión:',err);}
-  currentUser=null;$('userProfile').hidden=true;openAuthModal();return false;
+  } catch (err) { console.error('Error al verificar sesión:', err); }
+  currentUser = null; $('userProfile').hidden = true; $('manageTeamBtn').hidden = true; openAuthModal(); return false;
 }
 
-async function loadOperators(){
-  const select=$('operatorSelect');
-  select.innerHTML='<option value="">Cargando operarios...</option>';
-  try{
-    const res=await fetch('/api/auth/operators',{cache:'no-store'});
-    if(res.ok){
-      const data=await res.json();
-      if(data.operators&&data.operators.length>0){
-        select.innerHTML='<option value="">-- Selecciona tu nombre --</option>'+data.operators.map(op=>`<option value="${op.id}">${op.name}</option>`).join('');
+async function loadOperators() {
+  const select = $('operatorSelect');
+  select.innerHTML = '<option value="">Cargando usuarios de planta...</option>';
+  try {
+    const res = await fetch('/api/auth/operators', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.operators && data.operators.length > 0) {
+        select.innerHTML = '<option value="">-- Selecciona tu nombre --</option>' + data.operators.map(op => {
+          const tag = op.role === 'supervisor' && !op.name.toLowerCase().includes('supervisor') ? `${op.name} (Supervisor)` : op.name;
+          return `<option value="${op.id}">${tag}</option>`;
+        }).join('');
         return;
       }
     }
-  }catch(err){console.error('Error al cargar operarios:',err);}
-  select.innerHTML='<option value="">No hay operarios registrados</option>';
+  } catch (err) { console.error('Error al cargar operarios:', err); }
+  select.innerHTML = '<option value="">No hay operarios registrados</option>';
 }
 
 function openAuthModal(){
@@ -273,9 +287,107 @@ $('formGerente').addEventListener('submit',async e=>{
 
 $('logoutBtn').addEventListener('click',async()=>{
   try{await fetch('/api/auth/logout',{method:'POST'});}catch(err){console.error('Error al cerrar sesión:',err);}
-  currentUser=null;$('userProfile').hidden=true;openAuthModal();toast('Sesión cerrada correctamente.');
+  currentUser=null;$('userProfile').hidden=true;$('manageTeamBtn').hidden=true;openAuthModal();toast('Sesión cerrada correctamente.');
 });
 
 $('cloudSignIn').addEventListener('click',openAuthModal);
+
+// Panel de Gestión de Equipo (Rol Gerente)
+$('manageTeamBtn').addEventListener('click',()=>{
+  $('machineQrUrl').value=`${window.location.origin}/?machine=${encodeURIComponent(activeMachineId)}`;
+  loadTeamUsers();
+  if(!$('teamModal').open)$('teamModal').showModal();
+});
+
+$('closeTeamModal').addEventListener('click',()=>{
+  $('teamModal').close();
+});
+
+$('copyQrUrlBtn').addEventListener('click',async()=>{
+  try{
+    await navigator.clipboard.writeText($('machineQrUrl').value);
+    toast('Enlace copiado al portapapeles');
+  }catch{
+    $('machineQrUrl').select();document.execCommand('copy');toast('Enlace copiado');
+  }
+});
+
+async function loadTeamUsers(){
+  const container=$('teamUsersList');
+  container.innerHTML='<p>Cargando perfiles...</p>';
+  try{
+    const res=await fetch('/api/users',{cache:'no-store'});
+    if(!res.ok){container.innerHTML='<p class="form-error">No se pudo cargar la lista de usuarios.</p>';return;}
+    const data=await res.json();
+    if(!data.users||data.users.length===0){container.innerHTML='<p>No hay usuarios registrados.</p>';return;}
+    container.innerHTML=data.users.map(u=>{
+      const isSelf=currentUser&&currentUser.id===u.id;
+      const statusBadge=u.active?'':'<span class="badge-status-inactive">Inactivo</span>';
+      const toggleLabel=u.active?'Desactivar':'Activar';
+      const toggleBtn=isSelf?'':`<button type="button" class="button secondary compact" data-action="toggle" data-id="${u.id}" data-active="${u.active}">${toggleLabel}</button>`;
+      const pinBtn=(u.role==='operario'||u.role==='supervisor')?`<button type="button" class="button secondary compact" data-action="pin" data-id="${u.id}" data-name="${u.name}">Cambiar PIN</button>`:'';
+      return `<div class="team-user-row">
+        <div class="team-user-info">
+          <strong>${u.name}</strong>
+          <span class="badge-role ${u.role}">${u.role}</span>
+          ${statusBadge}
+        </div>
+        <div class="team-user-actions">${pinBtn}${toggleBtn}</div>
+      </div>`;
+    }).join('');
+
+    container.querySelectorAll('button[data-action="toggle"]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const id=btn.getAttribute('data-id');
+        const activeNow=btn.getAttribute('data-active')==='true';
+        btn.disabled=true;
+        try{
+          const patchRes=await fetch(`/api/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({active:!activeNow})});
+          if(patchRes.ok){toast('Estado actualizado');await loadTeamUsers();loadOperators();}
+          else{toast('Error al actualizar estado');}
+        }catch{toast('Error de conexión');}
+        finally{btn.disabled=false;}
+      });
+    });
+
+    container.querySelectorAll('button[data-action="pin"]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const id=btn.getAttribute('data-id');
+        const name=btn.getAttribute('data-name');
+        openDialog(`Cambiar PIN de ${name}`,`<p>Ingresa el nuevo PIN (4 a 6 dígitos) para este usuario:</p><label><strong>Nuevo PIN</strong><input id="promptNewPin" type="password" pattern="[0-9]*" inputmode="numeric" maxlength="6" placeholder="Ej. 1234" required style="width:100%;padding:8px 10px;margin-top:6px;border:1px solid var(--border);border-radius:6px;"></label>`,'Guardar PIN',async()=>{
+          const newPin=$('promptNewPin')?.value?.trim();
+          if(!newPin||newPin.length<4){toast('El PIN debe tener al menos 4 dígitos');return;}
+          closeDialog();
+          try{
+            const patchRes=await fetch(`/api/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:newPin})});
+            if(patchRes.ok){toast(`PIN de ${name} actualizado`);}
+            else{toast('No se pudo actualizar el PIN');}
+          }catch{toast('Error de conexión');}
+        });
+      });
+    });
+  }catch(err){console.error('Error al cargar equipo:',err);container.innerHTML='<p class="form-error">Error al cargar usuarios.</p>';}
+}
+
+$('createMemberForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('createMemberMsg').hidden=true;
+  const name=$('newMemberName').value.trim();
+  const role=$('newMemberRole').value;
+  const pin=$('newMemberPin').value.trim();
+  if(!name||!pin||pin.length<4){
+    $('createMemberMsg').textContent='Ingresa el nombre y un PIN de al menos 4 dígitos.';
+    $('createMemberMsg').hidden=false;return;
+  }
+  const btn=$('submitCreateMember');btn.disabled=true;btn.textContent='Creando...';
+  try{
+    const res=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,role,pin})});
+    const data=await res.json();
+    if(!res.ok){$('createMemberMsg').textContent=data.error||'No se pudo crear el usuario.';$('createMemberMsg').hidden=false;return;}
+    $('newMemberName').value='';$('newMemberPin').value='';
+    toast(`Perfil creado: ${data.user.name} (${data.user.role})`);
+    await loadTeamUsers();loadOperators();
+  }catch{$('createMemberMsg').textContent='Error de conexión.';$('createMemberMsg').hidden=false;}
+  finally{btn.disabled=false;btn.textContent='Crear perfil';}
+});
 
 renderAll();showView(location.hash.slice(1));checkAuth();

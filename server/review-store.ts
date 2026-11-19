@@ -193,7 +193,7 @@ export async function handleReviews(
       return json({ error: 'El registro excede el tamaño permitido.' }, 413);
     }
 
-    let input: { revision?: unknown; data?: unknown };
+    let input: { revision?: unknown; data?: unknown; machineId?: unknown };
     try {
       input = JSON.parse(raw);
     } catch {
@@ -206,6 +206,10 @@ export async function handleReviews(
 
     const revisionNumber = Number(input.revision);
     const validData = input.data;
+    const targetMachineId = (typeof input.machineId === 'string' && input.machineId.trim())
+      ? input.machineId.trim()
+      : 'SF3015HM';
+    const targetMachineName = targetMachineId === 'SF3015HM' ? 'Senfeng SF3015HM' : `CNC ${targetMachineId}`;
 
     let existing: ReviewRow | null = null;
     if (isDrizzle) {
@@ -265,8 +269,8 @@ export async function handleReviews(
         .values({
           id: 'cnc',
           userId: userIdFk,
-          machineId: 'SF3015HM',
-          machineName: 'Senfeng SF3015HM',
+          machineId: targetMachineId,
+          machineName: targetMachineName,
           status,
           payload: payloadObj,
           revision: 1,
@@ -279,8 +283,8 @@ export async function handleReviews(
           target: reviews.id,
           set: {
             userId: userIdFk ?? undefined,
-            machineId: 'SF3015HM',
-            machineName: 'Senfeng SF3015HM',
+            machineId: targetMachineId,
+            machineName: targetMachineName,
             status,
             payload: payloadObj,
             revision: sql`${reviews.revision} + 1`,

@@ -1,11 +1,11 @@
-import { getSession, AuthSession } from '@/lib/auth';
+import { getSession, AuthSession, UserRole } from '@/lib/auth';
 
 export type ChatGPTUser = {
   userId: string;
   displayName: string;
   email: string;
   fullName: string | null;
-  role?: 'operario' | 'gerente';
+  role?: UserRole;
 };
 
 /**

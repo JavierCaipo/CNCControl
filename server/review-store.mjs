@@ -133,6 +133,11 @@ export async function handleReviews(request, { db, user, now = new Date() }) {
       return json({ error: 'Datos incompletos o inválidos. Conserva una copia y revisa la información.' }, 400);
     }
 
+    const targetMachineId = (typeof input.machineId === 'string' && input.machineId.trim())
+      ? input.machineId.trim()
+      : 'SF3015HM';
+    const targetMachineName = targetMachineId === 'SF3015HM' ? 'Senfeng SF3015HM' : `CNC ${targetMachineId}`;
+
     let existing = null;
     if (isDrizzle) {
       const { eq, sql } = await import('drizzle-orm');
@@ -191,8 +196,8 @@ export async function handleReviews(request, { db, user, now = new Date() }) {
         .values({
           id: 'cnc',
           userId: userIdFk,
-          machineId: 'SF3015HM',
-          machineName: 'Senfeng SF3015HM',
+          machineId: targetMachineId,
+          machineName: targetMachineName,
           status,
           payload: payloadObj,
           revision: 1,
@@ -205,8 +210,8 @@ export async function handleReviews(request, { db, user, now = new Date() }) {
           target: reviews.id,
           set: {
             userId: userIdFk ?? undefined,
-            machineId: 'SF3015HM',
-            machineName: 'Senfeng SF3015HM',
+            machineId: targetMachineId,
+            machineName: targetMachineName,
             status,
             payload: payloadObj,
             revision: sql`${reviews.revision} + 1`,

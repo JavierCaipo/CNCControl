@@ -1,4 +1,4 @@
-export function createCloudSync({getData,onStatus,onRemote,onIdentity,onSaved,fetcher=fetch,now=()=>new Date()}){
+export function createCloudSync({getData,getMachineId,onStatus,onRemote,onIdentity,onSaved,fetcher=fetch,now=()=>new Date()}){
   const state={ready:false,dirty:false,saving:false,conflict:false,error:'',revision:0,updatedAt:null,updatedBy:null,user:null,sequence:0};
   let timer;
   const emit=()=>onStatus({...state});
@@ -26,7 +26,8 @@ export function createCloudSync({getData,onStatus,onRemote,onIdentity,onSaved,fe
     clearTimeout(timer);if(!state.ready||!state.dirty||state.saving||state.conflict)return false;
     const sequence=state.sequence;const data=getData();state.saving=true;state.error='';emit();
     try{
-      const result=await request('PUT',{revision:state.revision,data});remember(result);state.error='';
+      const machineId=typeof getMachineId==='function'?getMachineId():undefined;
+      const result=await request('PUT',{revision:state.revision,data,machineId});remember(result);state.error='';
       state.dirty=state.sequence!==sequence;onSaved(result,sequence===state.sequence);return true;
     }catch(e){state.error=e.message;if(e.status===409)state.conflict=true;return false;}
     finally{state.saving=false;emit();if(state.dirty&&!state.error&&!state.conflict)timer=setTimeout(flush,100);}

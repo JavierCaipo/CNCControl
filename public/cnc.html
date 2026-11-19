@@ -23,8 +23,13 @@
     <header class="topbar">
       <span>Mantenimiento <span class="crumb">/</span> <strong id="pageCrumb">Revisión previa</strong></span>
       <div class="topbar-actions">
+        <div id="qrMachineBadge" class="qr-machine-badge" hidden>
+          <span class="qr-icon" aria-hidden="true">⚲</span>
+          <span>Máquina detectada por QR: <strong id="qrMachineName">SF3015HM</strong></span>
+        </div>
         <span class="top-date" id="topDate"></span>
         <div id="userProfile" class="user-profile" hidden>
+          <button id="manageTeamBtn" class="button secondary compact" type="button" hidden>Equipo / Perfiles</button>
           <span id="userBadge" class="user-badge"></span>
           <button id="logoutBtn" class="button secondary compact" type="button">Cerrar sesión</button>
         </div>
@@ -68,6 +73,75 @@
       <footer>IMAD-3D <span>·</span> Senfeng SF3015HM <span>·</span> Plan preventivo / revisión por turno <span class="footer-version">Registro compartido · Manual V1</span></footer>
     </main>
   </div>
+  <!-- Modal de Gestión de Equipo (Solo Gerentes) -->
+  <dialog id="teamModal" class="team-modal" aria-labelledby="teamModalTitle">
+    <div class="dialog-head">
+      <h2 id="teamModalTitle">Gestión de Equipo y Accesos</h2>
+      <button id="closeTeamModal" class="icon-button" type="button" aria-label="Cerrar">×</button>
+    </div>
+
+    <!-- Sección QR de Máquina -->
+    <div class="card team-qr-section">
+      <div class="section-intro">
+        <span class="section-number">QR</span>
+        <div>
+          <h3>URL para QR de Máquina</h3>
+          <p>Enlace directo para escanear en la consola física de la máquina CNC.</p>
+        </div>
+      </div>
+      <div class="qr-copy-row">
+        <input type="text" id="machineQrUrl" readonly value="">
+        <button type="button" class="button secondary compact" id="copyQrUrlBtn">Copiar enlace</button>
+      </div>
+    </div>
+
+    <!-- Formulario Crear Operario / Supervisor -->
+    <div class="card team-create-card">
+      <div class="section-intro">
+        <span class="section-number">＋</span>
+        <div>
+          <h3>Nuevo Perfil de Planta</h3>
+          <p>Crea un acceso por PIN para operadores o supervisores.</p>
+        </div>
+      </div>
+      <form id="createMemberForm" class="team-form-grid">
+        <label>
+          <strong>Nombre completo</strong>
+          <input type="text" id="newMemberName" placeholder="Ej. Roberto Gómez" required>
+        </label>
+        <label>
+          <strong>Rol en planta</strong>
+          <select id="newMemberRole">
+            <option value="operario">Operario</option>
+            <option value="supervisor">Supervisor</option>
+          </select>
+        </label>
+        <label>
+          <strong>PIN numérico (4-6 dígitos)</strong>
+          <input type="password" id="newMemberPin" pattern="[0-9]*" inputmode="numeric" maxlength="6" placeholder="Ej. 1234" required>
+        </label>
+        <div class="team-create-action">
+          <button type="submit" class="button primary" id="submitCreateMember">Crear perfil</button>
+        </div>
+      </form>
+      <p id="createMemberMsg" class="form-error" role="alert" hidden></p>
+    </div>
+
+    <!-- Lista de Usuarios -->
+    <div class="card team-list-card">
+      <div class="section-intro">
+        <span class="section-number">👥</span>
+        <div>
+          <h3>Usuarios Registrados</h3>
+          <p>Activa, desactiva o actualiza el PIN de acceso.</p>
+        </div>
+      </div>
+      <div id="teamUsersList" class="team-users-list">
+        <p>Cargando perfiles...</p>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="actionDialog"><div class="dialog-head"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-button" aria-label="Cerrar">×</button></div><form id="dialogForm"><div id="dialogContent"></div><p id="dialogError" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">Cancelar</button><button class="button primary" id="confirmDialog" type="submit"></button></div></form></dialog>
 
   <!-- Modal de Autenticación de Planta -->

@@ -40,36 +40,52 @@ async function seed() {
       console.log(`ℹ️  Gerente ya existente: ${gerenteEmail}`);
     }
 
-    // 2 Operarios de prueba
-    const operarios = [
-      {
-        name: 'Santiago Caipo (Operador)',
-        role: 'operario' as const,
-        pin: '1234',
-      },
-      {
-        name: 'Juan Pérez (Operador)',
-        role: 'operario' as const,
-        pin: '5678',
-      },
-    ];
+    // 1 Supervisor de prueba
+    const supervisorName = 'Santiago Caipo (Supervisor)';
+    const supervisorPin = '1234';
+    const supervisorPinHash = await bcrypt.hash(supervisorPin, 10);
+    const existingSupervisor = await db
+      .select()
+      .from(users)
+      .where(eq(users.name, supervisorName))
+      .limit(1);
 
-    for (const op of operarios) {
-      const existingOp = await db.select().from(users).where(eq(users.name, op.name)).limit(1);
-      if (existingOp.length === 0) {
-        const pinHash = await bcrypt.hash(op.pin, 10);
-        await db.insert(users).values({
-          name: op.name,
-          role: op.role,
-          email: null,
-          passwordHash: null,
-          pinHash,
-          active: true,
-        });
-        console.log(`✅ Operario creado: ${op.name} | PIN: ${op.pin}`);
-      } else {
-        console.log(`ℹ️  Operario ya existente: ${op.name}`);
-      }
+    if (existingSupervisor.length === 0) {
+      await db.insert(users).values({
+        name: supervisorName,
+        role: 'supervisor',
+        email: null,
+        passwordHash: null,
+        pinHash: supervisorPinHash,
+        active: true,
+      });
+      console.log(`✅ Supervisor creado: ${supervisorName} | PIN: ${supervisorPin}`);
+    } else {
+      console.log(`ℹ️  Supervisor ya existente: ${supervisorName}`);
+    }
+
+    // 1 Operario de prueba
+    const operarioName = 'Juan Pérez (Operador)';
+    const operarioPin = '5678';
+    const operarioPinHash = await bcrypt.hash(operarioPin, 10);
+    const existingOperario = await db
+      .select()
+      .from(users)
+      .where(eq(users.name, operarioName))
+      .limit(1);
+
+    if (existingOperario.length === 0) {
+      await db.insert(users).values({
+        name: operarioName,
+        role: 'operario',
+        email: null,
+        passwordHash: null,
+        pinHash: operarioPinHash,
+        active: true,
+      });
+      console.log(`✅ Operario creado: ${operarioName} | PIN: ${operarioPin}`);
+    } else {
+      console.log(`ℹ️  Operario ya existente: ${operarioName}`);
     }
 
     console.log('\n🎉 ¡Siembra de base de datos completada exitosamente!');
@@ -78,12 +94,12 @@ async function seed() {
     console.log('1. Gerente:');
     console.log(`   - Email: ${gerenteEmail}`);
     console.log(`   - Contraseña: ${gerentePassword}`);
-    console.log('2. Operario 1:');
-    console.log('   - Nombre: Santiago Caipo (Operador)');
-    console.log('   - PIN: 1234');
-    console.log('3. Operario 2:');
-    console.log('   - Nombre: Juan Pérez (Operador)');
-    console.log('   - PIN: 5678');
+    console.log('2. Supervisor:');
+    console.log(`   - Nombre: ${supervisorName}`);
+    console.log(`   - PIN: ${supervisorPin}`);
+    console.log('3. Operario:');
+    console.log(`   - Nombre: ${operarioName}`);
+    console.log(`   - PIN: ${operarioPin}`);
     console.log('--------------------------------------------------\n');
   } catch (error) {
     console.error('❌ Error durante la siembra de datos:', error);
@@ -94,4 +110,3 @@ async function seed() {
 }
 
 seed();
-

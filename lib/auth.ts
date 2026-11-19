@@ -5,10 +5,12 @@ const JWT_SECRET = process.env.AUTH_SECRET || process.env.JWT_SECRET || 'cnc-ima
 const secretKey = new TextEncoder().encode(JWT_SECRET);
 export const AUTH_COOKIE_NAME = 'cnc_session';
 
+export type UserRole = 'operario' | 'supervisor' | 'gerente';
+
 export interface AuthSession {
   userId: string;
   name: string;
-  role: 'operario' | 'gerente';
+  role: UserRole;
   email: string | null;
 }
 
@@ -38,7 +40,7 @@ export async function verifySessionToken(token: string): Promise<AuthSession | n
     return {
       userId: String(payload.userId),
       name: String(payload.name),
-      role: payload.role as 'operario' | 'gerente',
+      role: payload.role as UserRole,
       email: payload.email ? String(payload.email) : null,
     };
   } catch {
