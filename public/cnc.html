@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Revisión preventiva antes de operar la CNC Senfeng SF3015HM. Checklist, incidencias y estado previo al uso.">
+  <meta name="theme-color" content="#152923"><title>CNC · Control previo al uso</title>
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css?v=2"><script type="module" src="/app.mjs?v=2"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand brand-official" href="#checklist" aria-label="IMAD-3D, inicio"><img src="/imad-logo.png" alt="IMAD 3D" width="425" height="86"><small>CONTROL DE MANTENIMIENTO</small></a>
+    <div class="workspace-label">ÁREA DE CORTE CNC</div>
+    <nav aria-label="Navegación principal">
+      <button data-view="checklist" class="nav-link active"><span class="nav-icon">✓</span>Revisión previa <span class="nav-count" id="navProgress">0/14</span></button>
+      <button data-view="alarms" class="nav-link"><span class="nav-icon">!</span>Alarmas e incidencias <span class="nav-count" id="navAlarms">0</span></button>
+      <button data-view="history" class="nav-link"><span class="nav-icon">↺</span>Historial</button>
+      <button data-view="guide" class="nav-link"><span class="nav-icon">≡</span>Guía de uso</button>
+    </nav>
+    <div class="equipment-card"><span class="eyebrow">EQUIPO EN REVISIÓN</span><div class="machine-icon" aria-hidden="true"><svg viewBox="0 0 150 74" fill="none"><path d="M10 58V19h115l15 13v26H10Zm0-39 13-9h102v9M20 29h56v21H20V29Zm64 0h32v21H84V29ZM18 58v7m112-7v7M42 29v21m57-31v10M123 36h7m-7 7h7" stroke="currentColor" stroke-width="2"/></svg></div><strong>Senfeng SF3015HM</strong><span>Láser de fibra · 6 kW</span><small>Serie SF202508262</small></div>
+    <div class="private-note"><span aria-hidden="true">●</span> Espacio privado<small>Solo personas autorizadas</small></div>
+  </aside>
+  <div class="app-shell">
+    <header class="topbar">
+      <span>Mantenimiento <span class="crumb">/</span> <strong id="pageCrumb">Revisión previa</strong></span>
+      <div class="topbar-actions">
+        <span class="top-date" id="topDate"></span>
+        <div id="userProfile" class="user-profile" hidden>
+          <span id="userBadge" class="user-badge"></span>
+          <button id="logoutBtn" class="button secondary compact" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+    </header>
+    <main>
+      <div class="page-heading"><div><div class="eyebrow">PLAN PREVENTIVO · ANTES DE OPERAR</div><h1 id="pageTitle">Revisa. Confirma. Opera.</h1><p id="pageSubtitle">Una revisión completa antes de cada inicio de turno.</p></div><button class="button secondary" id="newInspection" disabled><span aria-hidden="true">＋</span> Nueva revisión</button></div>
+      <div class="cloud-bar" id="cloudBar" role="status" aria-live="polite"><span class="cloud-dot" aria-hidden="true"></span><div><strong id="cloudTitle">Conectando con el registro compartido…</strong><small id="cloudDetail">Tus revisiones se guardan en la nube privada.</small></div><button id="cloudSignIn" type="button" class="button secondary compact" hidden>Iniciar sesión</button><button id="retryCloud" class="button secondary compact" hidden>Reintentar</button><button id="downloadPending" class="button secondary compact" hidden>Conservar copia</button><button id="recoverPending" class="button secondary compact" hidden>Recuperar cambios</button><button id="loadShared" class="button secondary compact" hidden>Cargar versión compartida</button></div>
+      <div class="legacy-note" id="legacyNote" hidden><span>Hay registros de la versión anterior en este navegador.</span><button id="importLegacy" class="text-button">Añadir al historial compartido</button><button id="downloadLegacy" class="text-button">Descargar copia anterior</button></div>
+      <div id="storageWarning" class="notice danger" hidden>El navegador no permite guardar los registros. Conserva una copia antes de cerrar.</div>
+      <fieldset id="cloudEditor" disabled>
+      <div class="stats-grid" aria-label="Resumen de la revisión">
+        <div class="stat"><span>Verificaciones conformes</span><div><strong id="okCount">0</strong><span class="stat-total">/ 14</span><span class="stat-icon mint">✓</span></div><div class="progress-track"><div id="progressBar"></div></div></div>
+        <div class="stat"><span>Incidencias abiertas</span><div><strong id="alarmCount">0</strong><span class="stat-icon amber">!</span></div><small id="alarmStatText">Sin incidencias registradas</small></div>
+        <div class="stat"><span>Estado previo al uso</span><div><strong class="status-stat" id="statusStat">Pendiente</strong><span class="stat-icon" id="statusIcon">◷</span></div><small id="statusStatText">Completa todas las verificaciones</small></div>
+      </div>
+
+      <section id="view-checklist" class="view">
+        <div class="inspection-meta card"><div class="section-intro"><span class="section-number">01</span><div><h2>Datos de la revisión</h2><p>Identifica al operador y el trabajo de este turno.</p></div><span class="save-status" id="saveStatus">Conectando con la nube</span></div><div class="form-grid"><label>Operador <span class="required">*</span><input id="operator" maxlength="120" autocomplete="name" placeholder="Nombre y apellido" required></label><label>OT / trabajo <span class="optional">Opcional</span><input id="ot" maxlength="120" placeholder="Ej. OT-175"></label><label>Momento de revisión<select id="shift"><option>Inicio de turno</option><option>Reinicio tras parada</option><option>Cambio de trabajo</option></select></label></div><div class="inspection-date" id="inspectionDate"></div></div>
+        <div class="checklist-layout">
+          <div class="card checklist-card"><div class="section-intro"><span class="section-number">02</span><div><h2>Checklist preventivo</h2><p>Marca conforme solo después de verificar físicamente.</p></div></div><div class="legend"><span><i class="dot green"></i>Conforme</span><span><i class="dot red"></i>Anomalía</span><span><i class="dot gray"></i>Pendiente</span></div><div id="checklistGroups"></div></div>
+          <aside class="review-column">
+            <div class="card final-card"><div class="eyebrow">RESULTADO DE LA REVISIÓN</div><div class="status-emblem" id="statusEmblem">◷</div><h2 id="finalTitle">Revisión pendiente</h2><p id="finalDescription">Completa el checklist y revisa las alarmas para validar el estado previo al uso.</p><div id="statusReasons" class="status-reasons"></div><div class="alarm-confirm"><label><input type="checkbox" id="alarmReviewed"><span>Revisé las alarmas del equipo y confirmé que no hay incidencias pendientes.</span></label></div><button class="button primary full" id="validateButton" disabled>Validar revisión</button><p class="small-note">La validación registra la revisión del operador. La condición real del equipo debe coincidir con lo registrado.</p><div id="verifiedDetail" hidden></div></div>
+            <div class="callout"><span class="callout-icon">!</span><div><strong>Calibration / Follow</strong><p>Siempre con una plancha bajo el cabezal. Verifica este punto antes de usar cualquiera de estas funciones.</p><small>Manual V1 · p. 22</small></div></div>
+            <button class="text-button" id="goAlarms">Consultar acciones por incidencia <span aria-hidden="true">↗</span></button>
+          </aside>
+        </div>
+        <div class="card notes-card"><label for="notes"><strong>Observaciones del turno</strong><span>Opcional · pendientes, hallazgos o seguimiento</span></label><textarea id="notes" rows="3" maxlength="4000" placeholder="Describe cualquier observación relevante de la revisión…"></textarea></div>
+      </section>
+
+      <section id="view-alarms" class="view" hidden>
+        <div class="notice"><span class="notice-icon">i</span><div><strong>Acciones documentadas para incidencias identificadas</strong><p>El manual V1 contiene problemas comunes, sin códigos oficiales de alarma. Busca por síntoma y registra el mensaje exacto del equipo. Las alarmas nuevas se derivan a mantenimiento.</p></div></div>
+        <div class="alarms-layout"><div class="card catalog"><div class="section-intro"><span class="section-number">01</span><div><h2>Consulta de acciones</h2><p>Manual de corte láser · p. 28</p></div></div><label class="search-label"><span aria-hidden="true">⌕</span><input type="search" id="alarmSearch" placeholder="Buscar boquilla, eje Z, rebaba…" aria-label="Buscar incidencias"></label><div id="guideList"></div></div><div class="card guide-detail" id="guideDetail"></div></div>
+        <div class="card incident-register"><div class="section-intro"><span class="section-number">02</span><div><h2>Incidencias de esta revisión</h2><p>Una incidencia abierta bloquea la validación previa al uso.</p></div></div><div id="incidentList"></div></div>
+      </section>
+
+      <section id="view-history" class="view" hidden><div class="card"><div class="section-intro"><span class="section-number">↺</span><div><h2>Revisiones guardadas</h2><p>Últimos 50 registros compartidos en la nube privada.</p></div><button class="button secondary compact" id="exportHistory">Descargar registros</button></div><div id="historyList"></div></div></section>
+
+      <section id="view-guide" class="view" hidden><div class="guide-grid"><article class="card prose"><div class="eyebrow">FLUJO DE TRABAJO</div><h2>Antes de usar la CNC</h2><ol><li><strong>Inicia una nueva revisión.</strong> Indica operador, OT si corresponde y el momento de revisión.</li><li><strong>Verifica cada punto.</strong> Usa Conforme, Anomalía o Pendiente. Puedes añadir una observación por punto.</li><li><strong>Revisa el equipo y sus alarmas.</strong> Consulta las acciones, copia el mensaje exacto y registra cualquier incidencia.</li><li><strong>Resuelve y comprueba.</strong> El cierre de una incidencia exige responsable y detalle de la intervención y comprobación.</li><li><strong>Valida la revisión.</strong> Todos los puntos deben estar conformes, sin incidencias abiertas, con operador y confirmación de alarmas.</li></ol></article><article class="card prose"><div class="eyebrow">CRITERIOS DEL ESTADO</div><h2>Qué significa cada resultado</h2><dl><dt class="red-text">Bloqueado</dt><dd>Hay una anomalía del checklist o una incidencia abierta.</dd><dt>Pendiente</dt><dd>Faltan puntos, operador o confirmación de alarmas; también si la revisión es de otro día.</dd><dt class="amber-text">Por validar</dt><dd>Se completaron los requisitos y falta registrar la validación del operador.</dd><dt class="green-text">Revisión validada</dt><dd>El operador registró el resultado. Cualquier cambio requiere validar de nuevo.</dd></dl></article><article class="card prose source-card"><div class="eyebrow">BASE DOCUMENTAL</div><h2>Manual y alcance</h2><p><strong>Manual de corte láser SENFENG SF3015HM · V1</strong><br>IMAD-3D · Santiago Javier Caipo Nuñez · 23/02/2026.</p><p>Checklist derivado de seguridad (p. 4), periféricos y consola (pp. 7–11), preparación (pp. 21–24) y mantenimiento básico (p. 27). Acciones de problemas comunes: p. 28. El cerramiento recoge la observación de planta del 09/10/2026.</p><p><strong>Rutinas de planta · 17/11/2026:</strong> al cierre diario, limpiar polvo de filtros y purgar el compresor; semanalmente, revisar estanqueidad de mangueras, purgar filtros y comprobar que no gotee agua; cada 3 meses, cambiar el agua del chiller. Registrar intervenciones en las observaciones. Frecuencias indicadas por planta; aplicar el procedimiento del fabricante.</p><p><strong>Protección ocular:</strong> selección conforme a ANSI Z136.1-2022. Verificar marcado de longitud de onda y densidad óptica (OD), certificado y compatibilidad con el láser instalado. El responsable de seguridad debe confirmar los valores antes de aprobar las gafas. <a href="https://www.osha.gov/shms/chapter-8" target="_blank" rel="noopener noreferrer">Referencia OSHA</a>. Requisitos y ensayos del producto: <a href="https://www.iso.org/obp/ui/#iso:std:iso:19818:-1:ed-1:v1:en" target="_blank" rel="noopener noreferrer">ISO 19818-1:2021</a> y certificado del fabricante.</p><p>El fallo del eje Z no tenía un procedimiento confirmado en el contexto del 12/10/2026. Se registra y deriva a mantenimiento; no se indica un reset ni una reparación improvisada.</p><p>La secuencia de encendido debe seguir el procedimiento vigente validado en planta. Esta herramienta registra inspecciones; no controla la máquina.</p></article><article class="card prose"><div class="eyebrow">TUS REGISTROS</div><h2>Guardado y continuidad</h2><p>La revisión se guarda automáticamente en la nube privada, con una copia de respaldo en este navegador. Al validar o empezar una nueva revisión, se conserva una copia en el historial compartido.</p><p>Las personas autorizadas consultan la misma revisión desde su celular o computadora. El indicador superior confirma cuándo se guardaron los cambios. Si dos personas editan a la vez, se conserva una copia local y se pide cargar la versión compartida para evitar sobrescrituras.</p><p>Sin conexión, los cambios quedan pendientes en este navegador. La validación requiere que los cambios anteriores estén sincronizados. Usa <strong>Conservar copia</strong> o <strong>Descargar registros</strong> para guardar un respaldo. Una revisión de otro día queda pendiente.</p></article></div></section>
+      </fieldset>
+      <footer>IMAD-3D <span>·</span> Senfeng SF3015HM <span>·</span> Plan preventivo / revisión por turno <span class="footer-version">Registro compartido · Manual V1</span></footer>
+    </main>
+  </div>
+  <dialog id="actionDialog"><div class="dialog-head"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-button" aria-label="Cerrar">×</button></div><form id="dialogForm"><div id="dialogContent"></div><p id="dialogError" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">Cancelar</button><button class="button primary" id="confirmDialog" type="submit"></button></div></form></dialog>
+
+  <!-- Modal de Autenticación de Planta -->
+  <dialog id="authModal" aria-labelledby="authTitle">
+    <div class="dialog-head">
+      <h2 id="authTitle">Control de Acceso CNC</h2>
+    </div>
+    <div class="auth-tabs" role="tablist">
+      <button type="button" id="tabOperario" class="auth-tab active" role="tab" aria-selected="true">Operario (PIN)</button>
+      <button type="button" id="tabGerente" class="auth-tab" role="tab" aria-selected="false">Gerente (Email)</button>
+    </div>
+    <p id="authError" class="form-error" role="alert" hidden></p>
+
+    <!-- Panel Operario -->
+    <form id="formOperario" class="auth-panel">
+      <p>Selecciona tu nombre y digita tu PIN de planta para iniciar turno.</p>
+      <label for="operatorSelect">
+        <strong>Operario en turno</strong>
+        <select id="operatorSelect" required>
+          <option value="">Cargando operarios...</option>
+        </select>
+      </label>
+      <label for="operatorPin">
+        <strong>PIN numérico</strong>
+        <input type="password" id="operatorPin" pattern="[0-9]*" inputmode="numeric" maxlength="6" placeholder="Ingresa tu PIN (ej. 1234)" required autocomplete="current-password">
+      </label>
+      <div class="dialog-actions">
+        <button type="submit" class="button primary full" id="submitOperario">Ingresar como Operario</button>
+      </div>
+    </form>
+
+    <!-- Panel Gerente -->
+    <form id="formGerente" class="auth-panel" hidden>
+      <p>Acceso administrativo para supervisión y gestión de registros.</p>
+      <label for="managerEmail">
+        <strong>Correo electrónico</strong>
+        <input type="email" id="managerEmail" placeholder="gerente@imad3d.com" required autocomplete="username">
+      </label>
+      <label for="managerPassword">
+        <strong>Contraseña</strong>
+        <input type="password" id="managerPassword" placeholder="Contraseña de gerente" required autocomplete="current-password">
+      </label>
+      <div class="dialog-actions">
+        <button type="submit" class="button primary full" id="submitGerente">Ingresar como Gerente</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
