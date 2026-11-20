@@ -5,13 +5,15 @@ const JWT_SECRET = process.env.AUTH_SECRET || process.env.JWT_SECRET || 'cnc-ima
 const secretKey = new TextEncoder().encode(JWT_SECRET);
 export const AUTH_COOKIE_NAME = 'cnc_session';
 
-export type UserRole = 'operario' | 'supervisor' | 'gerente';
+export type UserRole = 'superadmin' | 'gerente' | 'supervisor' | 'operario';
 
 export interface AuthSession {
   userId: string;
   name: string;
   role: UserRole;
   email: string | null;
+  organizationId?: string | null;
+  organizationSlug?: string | null;
 }
 
 /**
@@ -23,6 +25,8 @@ export async function createSessionToken(session: AuthSession): Promise<string> 
     name: session.name,
     role: session.role,
     email: session.email,
+    organizationId: session.organizationId || null,
+    organizationSlug: session.organizationSlug || null,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -42,6 +46,8 @@ export async function verifySessionToken(token: string): Promise<AuthSession | n
       name: String(payload.name),
       role: payload.role as UserRole,
       email: payload.email ? String(payload.email) : null,
+      organizationId: payload.organizationId ? String(payload.organizationId) : null,
+      organizationSlug: payload.organizationSlug ? String(payload.organizationSlug) : null,
     };
   } catch {
     return null;

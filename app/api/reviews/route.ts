@@ -35,6 +35,11 @@ export async function GET(request: Request) {
     try {
       const conditions = [];
 
+      // Filtro de organización (multi-tenant)
+      if (session.organizationId) {
+        conditions.push(eq(reviews.organizationId, session.organizationId));
+      }
+
       // Filtro de rol: el operario solo puede ver sus propios registros
       if (session.role === 'operario') {
         conditions.push(eq(reviews.userId, session.userId));

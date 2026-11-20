@@ -137,6 +137,7 @@ export interface ReviewHandlerUser {
   displayName?: string | null;
   name?: string | null;
   role?: string;
+  organizationId?: string | null;
 }
 
 export async function handleReviews(
@@ -264,10 +265,12 @@ export async function handleReviews(
     if (isDrizzle) {
       const drizzleDb = db as AppDatabase;
       const userIdFk = isValidUuid(userId) ? userId : null;
+      const orgIdFk = isValidUuid(user.organizationId) ? user.organizationId : null;
       const result = await drizzleDb
         .insert(reviews)
         .values({
           id: 'cnc',
+          organizationId: orgIdFk,
           userId: userIdFk,
           machineId: targetMachineId,
           machineName: targetMachineName,
@@ -282,6 +285,7 @@ export async function handleReviews(
         .onConflictDoUpdate({
           target: reviews.id,
           set: {
+            organizationId: orgIdFk ?? undefined,
             userId: userIdFk ?? undefined,
             machineId: targetMachineId,
             machineName: targetMachineName,

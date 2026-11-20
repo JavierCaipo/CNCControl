@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, and } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { users, UserRole } from '@/db/schema';
 import { getSession } from '@/lib/auth';
@@ -12,15 +12,23 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
   }
-  if (session.role !== 'gerente') {
-    return NextResponse.json({ error: 'Acceso restringido a gerentes.' }, { status: 403 });
+  if (session.role !== 'gerente' && session.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Acceso restringido a gerentes y administradores.' }, { status: 403 });
   }
 
   try {
     const db = getDb();
+    const conditions = [];
+
+    // Si no es superadmin, aislamos por organización
+    if (session.role !== 'superadmin' && session.organizationId) {
+      conditions.push(eq(users.organizationId, session.organizationId));
+    }
+
     const allUsers = await db
       .select({
         id: users.id,
+        organizationId: users.organizationId,
         name: users.name,
         role: users.role,
         email: users.email,
@@ -28,6 +36,7 @@ export async function GET() {
         createdAt: users.createdAt,
       })
       .from(users)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(users.createdAt));
 
     return NextResponse.json({ users: allUsers });
@@ -42,8 +51,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
   }
-  if (session.role !== 'gerente') {
-    return NextResponse.json({ error: 'Acceso restringido a gerentes.' }, { status: 403 });
+  if (session.role !== 'gerente' && session.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Acceso restringido a gerentes y administradores.' }, { status: 403 });
   }
 
   try {
@@ -54,6 +63,7 @@ export async function POST(request: Request) {
       password?: string;
       pin?: string;
       active?: boolean;
+      organizationId?: string;
     };
 
     const { name, role, email, password, pin, active } = body;
@@ -62,8 +72,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'El nombre es obligatorio.' }, { status: 400 });
     }
 
-    if (!role || !['gerente', 'supervisor', 'operario'].includes(role)) {
-      return NextResponse.json({ error: "El rol debe ser 'gerente', 'supervisor' o 'operario'." }, { status: 400 });
+    if (!role || !['superadmin', 'gerente', 'supervisor', 'operario'].includes(role)) {
+      return NextResponse.json({ error: "El rol debe ser 'gerente', 'supervisor', 'operario' o 'superadmin'." }, { status: 400 });
     }
 
     const cleanName = name.trim();
@@ -72,12 +82,12 @@ export async function POST(request: Request) {
     let passwordHash: string | null = null;
     let pinHash: string | null = null;
 
-    if (userRole === 'gerente') {
+    if (userRole === 'gerente' || userRole === 'superadmin') {
       if (!email || typeof email !== 'string' || !email.includes('@')) {
-        return NextResponse.json({ error: 'El correo electrónico es obligatorio para el rol gerente.' }, { status: 400 });
+        return NextResponse.json({ error: 'El correo electrónico es obligatorio para gerentes y administradores.' }, { status: 400 });
       }
       if (!password || typeof password !== 'string' || password.length < 6) {
-        return NextResponse.json({ error: 'La contraseña de gerente debe tener al menos 6 caracteres.' }, { status: 400 });
+        return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres.' }, { status: 400 });
       }
 
       cleanEmail = email.trim().toLowerCase();
@@ -100,10 +110,16 @@ export async function POST(request: Request) {
       }
     }
 
+    const targetOrgId =
+      session.role === 'superadmin' && body.organizationId !== undefined
+        ? body.organizationId || null
+        : session.organizationId || null;
+
     const db = getDb();
     const [newUser] = await db
       .insert(users)
       .values({
+        organizationId: targetOrgId,
         name: cleanName,
         role: userRole,
         email: cleanEmail,
@@ -113,6 +129,7 @@ export async function POST(request: Request) {
       })
       .returning({
         id: users.id,
+        organizationId: users.organizationId,
         name: users.name,
         role: users.role,
         email: users.email,
@@ -126,4 +143,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Error al crear el usuario.' }, { status: 500 });
   }
 }
-

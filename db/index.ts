@@ -7,11 +7,16 @@ declare global {
 }
 
 function createClient(connectionString: string) {
-  // Compatible con Supabase Transaction Pooler (puerto 6543 / PgBouncer):
-  // Se requiere { prepare: false } debido a que PgBouncer en Transaction mode
-  // no soporta sentencias preparadas de PostgreSQL a nivel de servidor.
+  // Compatible con Supabase Transaction Pooler (puerto 6543 / PgBouncer)
+  // y con PostgreSQL local en Docker (puerto 5433 sin SSL)
+  const isLocal =
+    connectionString.includes('localhost') ||
+    connectionString.includes('127.0.0.1') ||
+    connectionString.includes(':5433');
+
   return postgres(connectionString, {
     prepare: false,
+    ssl: isLocal ? false : undefined,
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,

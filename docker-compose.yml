@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cnc_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cnc_dev
+      POSTGRES_PASSWORD: cnc_dev_pass
+      POSTGRES_DB: cnc_control_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - cnc_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cnc_dev -d cnc_control_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cnc_pg_data:

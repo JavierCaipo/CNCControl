@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { users } from '@/db/schema';
+import { users, organizations } from '@/db/schema';
 import { createSessionToken, setSessionCookie } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const foundUsers = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, cleanEmail), eq(users.role, 'gerente'), eq(users.active, true)))
+      .where(and(eq(users.email, cleanEmail), inArray(users.role, ['gerente', 'superadmin']), eq(users.active, true)))
       .limit(1);
 
     const user = foundUsers[0];
@@ -43,11 +43,30 @@ export async function POST(request: Request) {
       );
     }
 
+    let organizationSlug: string | null = null;
+    if (user.organizationId) {
+      const orgs = await db
+        .select({ slug: organizations.slug, active: organizations.active })
+        .from(organizations)
+        .where(eq(organizations.id, user.organizationId))
+        .limit(1);
+      const org = orgs[0];
+      if (user.role !== 'superadmin' && org && !org.active) {
+        return NextResponse.json(
+          { error: 'La organización se encuentra suspendida. Contacta al administrador.' },
+          { status: 403 }
+        );
+      }
+      organizationSlug = org?.slug ?? null;
+    }
+
     const token = await createSessionToken({
       userId: user.id,
       name: user.name,
-      role: 'gerente',
+      role: user.role,
       email: user.email,
+      organizationId: user.organizationId,
+      organizationSlug,
     });
 
     await setSessionCookie(token);
@@ -59,6 +78,8 @@ export async function POST(request: Request) {
         name: user.name,
         role: user.role,
         email: user.email,
+        organizationId: user.organizationId,
+        organizationSlug,
       },
     });
   } catch (error) {

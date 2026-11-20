@@ -15,8 +15,8 @@ export async function PATCH(
   if (!session) {
     return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
   }
-  if (session.role !== 'gerente') {
-    return NextResponse.json({ error: 'Acceso restringido a gerentes.' }, { status: 403 });
+  if (session.role !== 'gerente' && session.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Acceso restringido a gerentes y administradores.' }, { status: 403 });
   }
 
   const { id } = await params;
@@ -31,6 +31,13 @@ export async function PATCH(
 
     if (!existing) {
       return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 });
+    }
+
+    // Aislamiento Multi-Tenant: un gerente no puede modificar usuarios de otra organización
+    if (session.role !== 'superadmin' && session.organizationId) {
+      if (existing.organizationId !== session.organizationId) {
+        return NextResponse.json({ error: 'Usuario no encontrado en esta organización.' }, { status: 404 });
+      }
     }
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -52,8 +59,12 @@ export async function PATCH(
     }
 
     if (role !== undefined) {
-      if (!['gerente', 'supervisor', 'operario'].includes(role)) {
-        return NextResponse.json({ error: "Rol no válido ('gerente', 'supervisor' o 'operario')." }, { status: 400 });
+      if (!['superadmin', 'gerente', 'supervisor', 'operario'].includes(role)) {
+        return NextResponse.json({ error: "Rol no válido ('gerente', 'supervisor', 'operario' o 'superadmin')." }, { status: 400 });
+      }
+      // Solo superadmin puede asignar el rol superadmin
+      if (role === 'superadmin' && session.role !== 'superadmin') {
+        return NextResponse.json({ error: 'No tienes permisos para asignar rol superadmin.' }, { status: 403 });
       }
       updates.role = role as UserRole;
     }
@@ -92,6 +103,7 @@ export async function PATCH(
       .where(eq(users.id, id))
       .returning({
         id: users.id,
+        organizationId: users.organizationId,
         name: users.name,
         role: users.role,
         email: users.email,
@@ -105,4 +117,3 @@ export async function PATCH(
     return NextResponse.json({ error: 'Error al actualizar el usuario.' }, { status: 500 });
   }
 }
-

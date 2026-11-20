@@ -19,6 +19,8 @@ export async function GET() {
       name: session.name,
       role: session.role,
       email: session.email,
+      organizationId: session.organizationId ?? null,
+      organizationSlug: session.organizationSlug ?? null,
     },
   });
 }
