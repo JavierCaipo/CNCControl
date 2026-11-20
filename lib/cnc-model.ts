@@ -25,6 +25,7 @@ export type CheckValue = 'ok' | 'fault' | 'pending';
 export interface CheckEntry {
   value: CheckValue;
   note: string;
+  evidenceUrls?: string[];
 }
 
 export interface Incident {
@@ -332,7 +333,23 @@ export function setCheck(state: ReviewState, id: string, value: CheckValue): Rev
   if (!CHECKS.some((c) => c.id === id) || !['ok', 'fault', 'pending'].includes(value)) {
     throw new Error('Verificación inválida');
   }
-  state.checks[id] = { value, note: state.checks[id]?.note || '' };
+  state.checks[id] = {
+    value,
+    note: state.checks[id]?.note || '',
+    evidenceUrls: state.checks[id]?.evidenceUrls || [],
+  };
+  return invalidate(state);
+}
+
+export function setCheckEvidence(state: ReviewState, id: string, urls: string[]): ReviewState {
+  if (!CHECKS.some((c) => c.id === id)) {
+    throw new Error('Verificación inválida');
+  }
+  const existing = state.checks[id] || { value: 'pending', note: '' };
+  state.checks[id] = {
+    ...existing,
+    evidenceUrls: urls,
+  };
   return invalidate(state);
 }
 
@@ -405,4 +422,68 @@ export function getStatus(state: ReviewState, now = new Date()): ReviewStatusInf
     faults || active ? 'blocked' : eligible ? (state.verifiedAt ? 'ready' : 'review') : 'pending';
 
   return { code, ok, faults, active, eligible, reasons, total: CHECKS.length };
+}
+
+export interface QualityValidationResult {
+  valid: boolean;
+  errors: string[];
+  calculatedStatus: 'ok' | 'warning' | 'critical';
+}
+
+/**
+ * Regla de calidad obligatoria para el cierre de turno:
+ * - Toda anomalía (fault) debe tener observación detallada (mínimo 5 caracteres).
+ * - Toda anomalía debe tener al menos una foto de evidencia adjunta.
+ * - Calcula el status: 'critical' si hay anomalías o alarmas abiertas; 'warning' si hay incidencias resueltas; 'ok' si todo conforme.
+ */
+export function validateReviewQuality(payload: {
+  checks: Record<string, CheckEntry>;
+  incidents?: Incident[];
+  evidenceUrls?: string[];
+}): QualityValidationResult {
+  const errors: string[] = [];
+  let hasFault = false;
+  let hasActiveIncident = false;
+  let hasResolvedIncident = false;
+
+  const checks = payload.checks || {};
+  const globalEvidence = payload.evidenceUrls || [];
+
+  for (const checkDef of CHECKS) {
+    const entry = checks[checkDef.id];
+    if (entry?.value === 'fault') {
+      hasFault = true;
+      const note = entry.note ? entry.note.trim() : '';
+      if (note.length < 5) {
+        errors.push(`El ítem "${checkDef.title}" tiene anomalía y requiere una observación detallada (mínimo 5 caracteres).`);
+      }
+      const itemEvidence = Array.isArray(entry.evidenceUrls) ? entry.evidenceUrls : [];
+      if (itemEvidence.length === 0 && globalEvidence.length === 0) {
+        errors.push(`El ítem "${checkDef.title}" tiene anomalía y requiere al menos una foto de evidencia adjunta.`);
+      }
+    }
+  }
+
+  const incidents = payload.incidents || [];
+  for (const inc of incidents) {
+    if (!inc.resolvedAt) {
+      hasActiveIncident = true;
+      errors.push(`Existe una incidencia/alarma abierta ("${inc.text}") sin resolver.`);
+    } else {
+      hasResolvedIncident = true;
+    }
+  }
+
+  let calculatedStatus: 'ok' | 'warning' | 'critical' = 'ok';
+  if (hasFault || hasActiveIncident) {
+    calculatedStatus = 'critical';
+  } else if (hasResolvedIncident) {
+    calculatedStatus = 'warning';
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    calculatedStatus,
+  };
 }

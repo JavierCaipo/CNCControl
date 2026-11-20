@@ -101,3 +101,51 @@ export function restore(raw,now=new Date()) {
 }
 export function serialize(current,history) { return JSON.stringify({version:1,current,history:history.slice(-50)}); }
 export function snapshot(state) { return JSON.parse(JSON.stringify(state)); }
+
+export function validateReviewQuality(payload) {
+  const errors = [];
+  let hasFault = false;
+  let hasActiveIncident = false;
+  let hasResolvedIncident = false;
+
+  const checks = payload.checks || {};
+  const globalEvidence = payload.evidenceUrls || [];
+
+  for (const checkDef of CHECKS) {
+    const entry = checks[checkDef.id];
+    if (entry?.value === 'fault') {
+      hasFault = true;
+      const note = entry.note ? entry.note.trim() : '';
+      if (note.length < 5) {
+        errors.push(`El ítem "${checkDef.title}" tiene anomalía y requiere una observación detallada (mínimo 5 caracteres).`);
+      }
+      const itemEvidence = Array.isArray(entry.evidenceUrls) ? entry.evidenceUrls : [];
+      if (itemEvidence.length === 0 && globalEvidence.length === 0) {
+        errors.push(`El ítem "${checkDef.title}" tiene anomalía y requiere al menos una foto de evidencia adjunta.`);
+      }
+    }
+  }
+
+  const incidents = payload.incidents || [];
+  for (const inc of incidents) {
+    if (!inc.resolvedAt) {
+      hasActiveIncident = true;
+      errors.push(`Existe una incidencia/alarma abierta ("${inc.text}") sin resolver.`);
+    } else {
+      hasResolvedIncident = true;
+    }
+  }
+
+  let calculatedStatus = 'ok';
+  if (hasFault || hasActiveIncident) {
+    calculatedStatus = 'critical';
+  } else if (hasResolvedIncident) {
+    calculatedStatus = 'warning';
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    calculatedStatus,
+  };
+}

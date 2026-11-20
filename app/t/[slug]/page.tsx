@@ -20,6 +20,14 @@ import {
   Building2,
   Lock,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +50,7 @@ import {
   resolveIncident,
   verify,
   CheckValue,
+  validateReviewQuality,
 } from "@/lib/cnc-model";
 import { CncAuthDialog } from "@/components/cnc/cnc-auth-dialog";
 import { CncMachinesModal, Machine } from "@/components/cnc/cnc-machines-modal";
@@ -119,6 +128,11 @@ function TenantConsoleContent() {
   const [historyList, setHistoryList] = React.useState<ReviewRecord[]>([]);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveMessage, setSaveMessage] = React.useState<string | null>(null);
+
+  // Shift closing state
+  const [isClosingShift, setIsClosingShift] = React.useState(false);
+  const [qualityValidationErrors, setQualityValidationErrors] = React.useState<string[] | null>(null);
+  const [closeSuccessModalOpen, setCloseSuccessModalOpen] = React.useState(false);
 
   // 1. Cargar datos del inquilino y máquinas en montaje
   React.useEffect(() => {
@@ -304,12 +318,106 @@ function TenantConsoleContent() {
         ...prev,
         checks: {
           ...prev.checks,
-          [id]: { value: prev.checks[id]?.value || "pending", note },
+          [id]: {
+            ...prev.checks[id],
+            value: prev.checks[id]?.value || "pending",
+            note,
+            evidenceUrls: prev.checks[id]?.evidenceUrls || [],
+          },
         },
       };
       persistReview(next);
       return next;
     });
+  };
+
+  const handleEvidenceChange = (id: string, urls: string[]) => {
+    setReview((prev) => {
+      const next = {
+        ...prev,
+        checks: {
+          ...prev.checks,
+          [id]: {
+            ...prev.checks[id],
+            value: prev.checks[id]?.value || "pending",
+            note: prev.checks[id]?.note || "",
+            evidenceUrls: urls,
+          },
+        },
+      };
+      persistReview(next);
+      return next;
+    });
+  };
+
+  const handleCloseShift = async () => {
+    if (!selectedMachine) {
+      alert("Por favor seleccione una máquina antes de cerrar el turno.");
+      return;
+    }
+    if (!currentUser) {
+      setAuthDialogOpen(true);
+      return;
+    }
+
+    // Recolectar todas las evidencias fotográficas de los ítems
+    const allEvidences: string[] = [];
+    for (const key of Object.keys(review.checks || {})) {
+      const entry = review.checks[key];
+      if (Array.isArray(entry.evidenceUrls)) {
+        allEvidences.push(...entry.evidenceUrls);
+      }
+    }
+
+    // Validación preliminar de calidad
+    const quality = validateReviewQuality({
+      checks: review.checks,
+      incidents: review.incidents,
+      evidenceUrls: allEvidences,
+    });
+
+    if (!quality.valid) {
+      setQualityValidationErrors(quality.errors);
+      return;
+    }
+
+    setIsClosingShift(true);
+    try {
+      const res = await fetch("/api/snapshots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          machineId: selectedMachine.id,
+          shift: review.shift,
+          workOrder: review.ot,
+          checklistPayload: review,
+          incidentsCount: review.incidents?.filter((i) => !i.resolvedAt).length || 0,
+          evidenceUrls: Array.from(new Set(allEvidences)),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.details && Array.isArray(data.details)) {
+          setQualityValidationErrors(data.details);
+        } else {
+          alert(data.error || "No se pudo cerrar el turno.");
+        }
+        return;
+      }
+
+      setCloseSuccessModalOpen(true);
+      const fresh = {
+        ...newInspection(),
+        operator: currentUser.name,
+      };
+      setReview(fresh);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+      alert(message);
+    } finally {
+      setIsClosingShift(false);
+    }
   };
 
   const handleFieldChange = (field: keyof ReviewState, value: string | boolean) => {
@@ -524,6 +632,21 @@ function TenantConsoleContent() {
             >
               <BookOpen className="size-3.5" />
               <span>Guía de Uso</span>
+            </Button>
+
+            {/* Cerrar y Registrar Turno */}
+            <Button
+              size="sm"
+              onClick={handleCloseShift}
+              disabled={isClosingShift}
+              className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
+            >
+              {isClosingShift ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-3.5" />
+              )}
+              <span>Cerrar y Registrar Turno</span>
             </Button>
 
             {/* Módulos exclusivos de Gerente / Super Admin */}
@@ -741,6 +864,8 @@ function TenantConsoleContent() {
             checks={review.checks}
             onCheckChange={handleCheckChange}
             onNoteChange={handleNoteChange}
+            onEvidenceChange={handleEvidenceChange}
+            machineCode={selectedMachine?.code || "CNC"}
           />
         </section>
       </main>
@@ -749,6 +874,81 @@ function TenantConsoleContent() {
       <footer className="border-t border-border py-4 px-6 text-center text-xs text-muted-foreground bg-card/40">
         <p>Registro compartido · Manual V1. - Desarrollado por Santiago Caipo</p>
       </footer>
+
+      {/* MODAL DE REQUISITOS DE CALIDAD PENDIENTES */}
+      <Dialog
+        open={!!qualityValidationErrors}
+        onOpenChange={(open) => !open && setQualityValidationErrors(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertOctagon className="size-5" />
+              <DialogTitle className="text-base font-bold">
+                Requisitos de Calidad Pendientes
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs">
+              Para cerrar oficialmente el turno y registrar el historial inmutable, debe subsanar los siguientes puntos:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            {qualityValidationErrors?.map((err, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive flex items-start gap-2"
+              >
+                <span className="font-bold">•</span>
+                <span>{err}</span>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQualityValidationErrors(null)}
+            >
+              Entendido, completar observaciones y fotos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE CONFIRMACIÓN DE TURNO CERRADO */}
+      <Dialog
+        open={closeSuccessModalOpen}
+        onOpenChange={setCloseSuccessModalOpen}
+      >
+        <DialogContent className="max-w-sm text-center">
+          <div className="size-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto mt-2">
+            <CheckCircle2 className="size-7" />
+          </div>
+          <DialogHeader className="text-center sm:text-center">
+            <DialogTitle className="text-lg font-bold">
+              Turno Cerrado Exitosamente
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              El registro oficial ha sido archivado de manera inmutable en el historial. El puesto queda listo para el siguiente turno.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pt-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                setCloseSuccessModalOpen(false);
+                setHistoryModalOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5"
+            >
+              <History className="size-3.5" />
+              <span>Ver en Historial Inmutable</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* MODALES AUXILIARES */}
       <CncAuthDialog
@@ -782,7 +982,7 @@ function TenantConsoleContent() {
         open={historyModalOpen}
         onOpenChange={setHistoryModalOpen}
         machineCode={selectedMachine?.code || "CNC"}
-        history={historyList}
+        currentUserRole={currentUser?.role}
       />
 
       <CncGuideModal open={guideModalOpen} onOpenChange={setGuideModalOpen} />
