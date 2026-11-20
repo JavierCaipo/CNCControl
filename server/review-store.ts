@@ -145,7 +145,7 @@ export async function handleReviews(
 ) {
   const userId = user?.userId || user?.id;
   const userEmail = user?.email;
-  if (!userId || !userEmail) {
+  if (!userId) {
     return json({ error: 'Inicia sesión con la cuenta autorizada para acceder al registro compartido.' }, 401);
   }
   if (!db) {
@@ -167,7 +167,7 @@ export async function handleReviews(
       }
       return json({
         ...rowData(row),
-        user: { displayName: user.displayName || user.name || userEmail, email: userEmail },
+        user: { displayName: user.displayName || user.name || userEmail || 'Operador', email: userEmail ?? null },
       });
     }
 
@@ -246,7 +246,7 @@ export async function handleReviews(
     }
 
     const updatedAtStr = now.toISOString();
-    const updatedBy = String(user.displayName || user.name || userEmail).slice(0, 200);
+    const updatedBy = String(user.displayName || user.name || userEmail || 'Operador').slice(0, 200);
     const payloadStr = serialize(normalized.current, normalized.history);
     const payloadObj = JSON.parse(payloadStr);
 

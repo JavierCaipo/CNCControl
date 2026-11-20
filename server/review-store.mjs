@@ -74,7 +74,9 @@ function isValidUuid(val) {
 }
 
 export async function handleReviews(request, { db, user, now = new Date() }) {
-  if (!user?.userId || !user?.email) {
+  const userId = user?.userId || user?.id;
+  const userEmail = user?.email;
+  if (!userId) {
     return json({ error: 'Inicia sesión con la cuenta autorizada para acceder al registro compartido.' }, 401);
   }
   if (!db) {
@@ -96,7 +98,7 @@ export async function handleReviews(request, { db, user, now = new Date() }) {
       }
       return json({
         ...rowData(row),
-        user: { displayName: user.displayName || user.email, email: user.email },
+        user: { displayName: user.displayName || user.name || userEmail || 'Operador', email: userEmail ?? null },
       });
     }
 
@@ -172,7 +174,7 @@ export async function handleReviews(request, { db, user, now = new Date() }) {
     }
 
     const updatedAtStr = now.toISOString();
-    const updatedBy = String(user.displayName || user.email).slice(0, 200);
+    const updatedBy = String(user.displayName || user.name || userEmail || 'Operador').slice(0, 200);
     const payloadStr = serialize(normalized.current, normalized.history);
     const payloadObj = JSON.parse(payloadStr);
 

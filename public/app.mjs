@@ -134,12 +134,14 @@ $('exportHistory').addEventListener('click',()=>{
 });
 $('dialogForm').addEventListener('submit',event=>{event.preventDefault();if(!dialogAction)return;try{dialogAction(new FormData(event.currentTarget));}catch(e){$('dialogError').textContent=e.message;$('dialogError').hidden=false;}});
 $('closeDialog').addEventListener('click',closeDialog);$('cancelDialog').addEventListener('click',closeDialog);
+$('actionDialog').addEventListener('click',e=>{if(e.target===$('actionDialog'))closeDialog();});
 function download(value,name){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function renderCloud(state){
   cloudState=state;
-  $('cloudEditor').disabled=!state.ready||state.conflict||pendingRecovery;
-  $('newInspection').disabled=!state.ready||state.conflict||state.dirty||state.saving||pendingRecovery;
-  $('importLegacy').disabled=!state.ready||state.conflict||state.dirty||state.saving||pendingRecovery;
+  const isBlocked=!currentUser||!state.ready||state.conflict||pendingRecovery;
+  $('cloudEditor').disabled=isBlocked;
+  $('newInspection').disabled=isBlocked||state.dirty||state.saving;
+  $('importLegacy').disabled=isBlocked||state.dirty||state.saving;
   $('cloudBar').className=`cloud-bar ${state.conflict?'cloud-conflict':state.error||pendingRecovery?'cloud-error':''}`;
   $('retryCloud').hidden=!(state.error&&!state.conflict&&(!pendingRecovery||!state.ready));
   $('downloadPending').hidden=!(state.dirty||state.conflict||pendingRecovery);
@@ -175,14 +177,37 @@ sync=createCloudSync({getData:data,getMachineId:()=>activeMachineId,onStatus:ren
   if(unchanged&&current.verifiedAt)toast('Revisión validada y guardada en la nube privada.');
 }});
 $('retryCloud').addEventListener('click',()=>sync.retry());
-$('downloadPending').addEventListener('click',()=>download(pendingRecovery?recoveredPending:{revision:sync.state.revision,data:data()},`CNC-cambios-pendientes-${today()}.json`));
+$('downloadPending').addEventListener('click',async()=>{
+  const toSave=pendingRecovery?recoveredPending:{revision:sync.state.revision,data:data()};
+  download(toSave,`CNC-cambios-pendientes-${today()}.json`);
+  toast('Copia descargada correctamente.');
+  if(pendingRecovery||sync.state.conflict){
+    try{localStorage.setItem(CONFLICT_KEY,JSON.stringify(toSave));localStorage.removeItem(PENDING_KEY);}catch{}
+    pendingRecovery=false;recoveredPending=null;
+    const ok=await sync.load({discard:true});
+    renderCloud(sync.state);
+    if(ok)toast('Copia conservada y formulario liberado con la versión compartida.');
+  }
+});
 $('recoverPending').addEventListener('click',()=>{
   if(!recoveredPending||recoveredPending.revision!==sync.state.revision)return;
-  ({current,history}=restore(JSON.stringify(recoveredPending.data)));pendingRecovery=false;recoveredPending=null;renderAll();save();sync.flush();
+  ({current,history}=restore(JSON.stringify(recoveredPending.data)));
+  pendingRecovery=false;recoveredPending=null;
+  try{localStorage.removeItem(PENDING_KEY);}catch{}
+  renderAll();save();sync.flush();
+  toast('Cambios recuperados y formulario listo.');
 });
 $('loadShared').addEventListener('click',()=>openDialog('Cargar la versión compartida',`<p>Se conservará una copia de los cambios pendientes en este navegador y se cargará el registro compartido más reciente. Usa <strong>Conservar copia</strong> si también quieres descargar el respaldo.</p>`,'Conservar y cargar',async()=>{
-  try{localStorage.setItem(CONFLICT_KEY,JSON.stringify(pendingRecovery?recoveredPending:{revision:sync.state.revision,data:data()}));}catch{toast('No se pudo conservar la copia local. Descárgala antes de continuar.');return;}
-  closeDialog();const ok=await sync.load({discard:true});if(ok){pendingRecovery=false;recoveredPending=null;try{localStorage.removeItem(PENDING_KEY);}catch{}renderCloud(sync.state);toast('Versión compartida cargada. La copia local anterior sigue conservada.');}
+  const toSave=pendingRecovery?recoveredPending:{revision:sync.state.revision,data:data()};
+  try{localStorage.setItem(CONFLICT_KEY,JSON.stringify(toSave));}catch{toast('No se pudo conservar la copia local. Descárgala antes de continuar.');return;}
+  closeDialog();
+  pendingRecovery=false;recoveredPending=null;
+  try{localStorage.removeItem(PENDING_KEY);}catch{}
+  const ok=await sync.load({discard:true});
+  renderCloud(sync.state);
+  if(ok){
+    toast('Versión compartida cargada. El formulario está listo para operar.');
+  }
 }));
 $('legacyNote').hidden=!(legacy&&(legacy.history.length||legacy.current.operator||Object.keys(legacy.current.checks).length||legacy.current.incidents.length));
 $('downloadLegacy').addEventListener('click',()=>download(legacy,`CNC-copia-anterior-${today()}.json`));
@@ -213,13 +238,18 @@ async function checkAuth(){
       $('userProfile').hidden = false;
       $('manageTeamBtn').hidden = currentUser.role !== 'gerente';
       if ($('authModal').open) $('authModal').close();
-      if ((currentUser.role === 'operario' || currentUser.role === 'supervisor') && !$('operator').value) {
-        $('operator').value = currentUser.name; current.operator = currentUser.name; save();
+      await sync.load();
+      if ((currentUser.role === 'operario' || currentUser.role === 'supervisor') && !current.operator) {
+        current.operator = currentUser.name;
+        fillMeta();
+        renderStatus();
+        save();
       }
-      sync.load(); return true;
+      renderCloud(sync.state);
+      return true;
     }
   } catch (err) { console.error('Error al verificar sesión:', err); }
-  currentUser = null; $('userProfile').hidden = true; $('manageTeamBtn').hidden = true; openAuthModal(); return false;
+  currentUser = null; $('userProfile').hidden = true; $('manageTeamBtn').hidden = true; renderCloud(sync.state); openAuthModal(); return false;
 }
 
 async function loadOperators() {
@@ -287,7 +317,7 @@ $('formGerente').addEventListener('submit',async e=>{
 
 $('logoutBtn').addEventListener('click',async()=>{
   try{await fetch('/api/auth/logout',{method:'POST'});}catch(err){console.error('Error al cerrar sesión:',err);}
-  currentUser=null;$('userProfile').hidden=true;$('manageTeamBtn').hidden=true;openAuthModal();toast('Sesión cerrada correctamente.');
+  currentUser=null;$('userProfile').hidden=true;$('manageTeamBtn').hidden=true;renderCloud(sync.state);openAuthModal();toast('Sesión cerrada correctamente.');
 });
 
 $('cloudSignIn').addEventListener('click',openAuthModal);
@@ -301,6 +331,9 @@ $('manageTeamBtn').addEventListener('click',()=>{
 
 $('closeTeamModal').addEventListener('click',()=>{
   $('teamModal').close();
+});
+$('teamModal').addEventListener('click',e=>{
+  if(e.target===$('teamModal'))$('teamModal').close();
 });
 
 $('copyQrUrlBtn').addEventListener('click',async()=>{
