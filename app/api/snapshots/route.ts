@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { reviewSnapshots, machines, users, reviews } from '@/db/schema';
 import { getSession } from '@/lib/auth';
 import { validateReviewQuality, newInspection } from '@/lib/cnc-model';
+import { sendCriticalAlert } from '@/lib/alerts';
 
 export async function GET(req: NextRequest) {
   try {
@@ -205,6 +206,25 @@ export async function POST(req: NextRequest) {
         evidenceUrls: photos,
       })
       .returning();
+
+    // Disparar alerta automática de webhook si el estado es crítico (no bloqueante)
+    if (quality.calculatedStatus === 'critical') {
+      sendCriticalAlert({
+        organizationId: targetOrgId,
+        snapshot,
+        machine: {
+          id: machine.id,
+          code: machine.code,
+          name: machine.name,
+        },
+        operator: {
+          id: session.userId,
+          name: session.name,
+        },
+      }).catch((alertErr) => {
+        console.error('Error al disparar alerta de webhook:', alertErr);
+      });
+    }
 
     // Limpiar o reiniciar el borrador en vivo en reviews para esta máquina
     try {

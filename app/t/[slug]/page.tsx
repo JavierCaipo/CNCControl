@@ -19,6 +19,8 @@ import {
   Loader2,
   Building2,
   Lock,
+  BarChart3,
+  Settings,
 } from "lucide-react";
 import {
   Dialog,
@@ -59,6 +61,7 @@ import { CncHistoryModal } from "@/components/cnc/cnc-history-modal";
 import { CncGuideModal } from "@/components/cnc/cnc-guide-modal";
 import { CncIncidentsModal } from "@/components/cnc/cnc-incidents-modal";
 import { CncChecklist } from "@/components/cnc/cnc-checklist";
+import { CncSettingsModal } from "@/components/cnc/cnc-settings-modal";
 
 interface TenantData {
   id: string;
@@ -122,6 +125,7 @@ function TenantConsoleContent() {
   const [historyModalOpen, setHistoryModalOpen] = React.useState(false);
   const [guideModalOpen, setGuideModalOpen] = React.useState(false);
   const [incidentsModalOpen, setIncidentsModalOpen] = React.useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = React.useState(false);
 
   // Operational review state
   const [review, setReview] = React.useState<ReviewState>(() => newInspection());
@@ -501,6 +505,10 @@ function TenantConsoleContent() {
   const status = getStatus(review);
   const activeIncidentsCount = review.incidents?.filter((i) => !i.resolvedAt).length || 0;
   const isManagerOrAdmin = currentUser?.role === "gerente" || currentUser?.role === "superadmin";
+  const isSupervisorOrManager =
+    currentUser?.role === "supervisor" ||
+    currentUser?.role === "gerente" ||
+    currentUser?.role === "superadmin";
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -649,6 +657,21 @@ function TenantConsoleContent() {
               <span>Cerrar y Registrar Turno</span>
             </Button>
 
+            {/* Dashboard para Supervisores y Gerentes */}
+            {isSupervisorOrManager && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="h-8 text-xs gap-1.5"
+              >
+                <Link href={`/t/${slug}/dashboard`}>
+                  <BarChart3 className="size-3.5 text-primary" />
+                  <span>Dashboard</span>
+                </Link>
+              </Button>
+            )}
+
             {/* Módulos exclusivos de Gerente / Super Admin */}
             {isManagerOrAdmin && (
               <>
@@ -670,6 +693,16 @@ function TenantConsoleContent() {
                 >
                   <Users className="size-3.5" />
                   <span>Equipo / Perfiles</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setSettingsModalOpen(true)}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Settings className="size-3.5" />
+                  <span>Alertas / Webhook</span>
                 </Button>
               </>
             )}
@@ -986,6 +1019,13 @@ function TenantConsoleContent() {
       />
 
       <CncGuideModal open={guideModalOpen} onOpenChange={setGuideModalOpen} />
+
+      <CncSettingsModal
+        open={settingsModalOpen}
+        onOpenChange={setSettingsModalOpen}
+        slug={slug}
+        tenantName={tenant?.name || ""}
+      />
 
       <CncIncidentsModal
         open={incidentsModalOpen}

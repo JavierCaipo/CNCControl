@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "alert_webhook_url" text;

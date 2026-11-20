@@ -14,6 +14,7 @@ export const organizations = pgTable('organizations', {
   logoUrl: text('logo_url'),
   plan: text('plan').$type<PlanType>().default('starter').notNull(),
   maxMachines: integer('max_machines').default(5).notNull(),
+  alertWebhookUrl: text('alert_webhook_url'),
   active: boolean('active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
