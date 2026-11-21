@@ -62,6 +62,7 @@ import { CncGuideModal } from "@/components/cnc/cnc-guide-modal";
 import { CncIncidentsModal } from "@/components/cnc/cnc-incidents-modal";
 import { CncChecklist } from "@/components/cnc/cnc-checklist";
 import { CncSettingsModal } from "@/components/cnc/cnc-settings-modal";
+import { CncQrCardModal } from "@/components/cnc/cnc-qr-card-modal";
 
 interface TenantData {
   id: string;
@@ -126,6 +127,7 @@ function TenantConsoleContent() {
   const [guideModalOpen, setGuideModalOpen] = React.useState(false);
   const [incidentsModalOpen, setIncidentsModalOpen] = React.useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = React.useState(false);
+  const [qrCardModalOpen, setQrCardModalOpen] = React.useState(false);
 
   // Operational review state
   const [review, setReview] = React.useState<ReviewState>(() => newInspection());
@@ -517,9 +519,19 @@ function TenantConsoleContent() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Logo y Empresa */}
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary shrink-0">
-              <Building2 className="size-5" />
-            </div>
+            {tenant.logoUrl ? (
+              <div className="size-9 rounded-lg bg-white p-0.5 border border-primary/20 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                <img
+                  src={tenant.logoUrl}
+                  alt={tenant.name}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary shrink-0">
+                <Building2 className="size-5" />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-base sm:text-lg leading-tight">{tenant.name}</h1>
@@ -557,6 +569,20 @@ function TenantConsoleContent() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Botón Directo QR Máquina */}
+              {selectedMachine && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQrCardModalOpen(true)}
+                  className="h-8 text-xs gap-1.5 border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/10"
+                  title="Ver e Imprimir Etiqueta QR"
+                >
+                  <QrCode className="size-3.5" />
+                  <span className="hidden md:inline font-medium">QR Máquina</span>
+                </Button>
+              )}
             </div>
 
             {/* Usuario / Sesión */}
@@ -1003,6 +1029,16 @@ function TenantConsoleContent() {
         maxMachines={tenant.maxMachines}
         machines={machines}
         onMachinesChange={refreshMachines}
+        logoUrl={tenant.logoUrl}
+      />
+
+      <CncQrCardModal
+        open={qrCardModalOpen}
+        onOpenChange={setQrCardModalOpen}
+        machine={selectedMachine}
+        slug={slug}
+        tenantName={tenant.name}
+        logoUrl={tenant.logoUrl}
       />
 
       <CncTeamModal
@@ -1025,6 +1061,10 @@ function TenantConsoleContent() {
         onOpenChange={setSettingsModalOpen}
         slug={slug}
         tenantName={tenant?.name || ""}
+        initialLogoUrl={tenant.logoUrl}
+        onLogoUpdated={(newLogo) =>
+          setTenant((prev) => (prev ? { ...prev, logoUrl: newLogo } : null))
+        }
       />
 
       <CncIncidentsModal

@@ -5,9 +5,6 @@ import {
   Server,
   Plus,
   QrCode,
-  Printer,
-  Copy,
-  Check,
   AlertTriangle,
   Loader2,
 } from "lucide-react";
@@ -32,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { generateQrSvg } from "@/lib/qr-code";
+import { CncQrCardModal } from "./cnc-qr-card-modal";
 
 export interface Machine {
   id: string;
@@ -53,6 +50,7 @@ interface CncMachinesModalProps {
   maxMachines: number;
   machines: Machine[];
   onMachinesChange: () => void;
+  logoUrl?: string | null;
 }
 
 export function CncMachinesModal({
@@ -63,6 +61,7 @@ export function CncMachinesModal({
   maxMachines,
   machines,
   onMachinesChange,
+  logoUrl,
 }: CncMachinesModalProps) {
   // Creation form state
   const [showCreateForm, setShowCreateForm] = React.useState(false);
@@ -76,7 +75,6 @@ export function CncMachinesModal({
   // QR Modal preview state
   const [qrModalOpen, setQrModalOpen] = React.useState(false);
   const [selectedMachine, setSelectedMachine] = React.useState<Machine | null>(null);
-  const [copied, setCopied] = React.useState(false);
 
   const activeCount = machines.filter((m) => m.active).length;
   const isAtLimit = activeCount >= maxMachines;
@@ -143,32 +141,7 @@ export function CncMachinesModal({
 
   const openQrPreview = (machine: Machine) => {
     setSelectedMachine(machine);
-    setCopied(false);
     setQrModalOpen(true);
-  };
-
-  const qrUrl = React.useMemo(() => {
-    if (!selectedMachine) return "";
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/t/${slug}?machine=${encodeURIComponent(selectedMachine.code)}`;
-    }
-    return `https://cnc.control/t/${slug}?machine=${encodeURIComponent(selectedMachine.code)}`;
-  }, [selectedMachine, slug]);
-
-  const qrSvgXml = React.useMemo(() => {
-    if (!qrUrl) return "";
-    return generateQrSvg(qrUrl, 200);
-  }, [qrUrl]);
-
-  const handleCopyLink = () => {
-    if (!qrUrl) return;
-    navigator.clipboard.writeText(qrUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   return (
@@ -388,85 +361,15 @@ export function CncMachinesModal({
         </DialogContent>
       </Dialog>
 
-      {/* QR Code Printable Dialog */}
-      <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
-        <DialogContent className="max-w-md print:border-none print:shadow-none print:p-0">
-          <DialogHeader className="print:hidden">
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <QrCode className="size-5 text-primary" />
-              <span>Etiqueta QR Industrial</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Pega esta etiqueta física en el chasis de la máquina para acceso directo en planta.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedMachine && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              {/* Contenedor Imprimible */}
-              <div
-                id="printable-qr-tag"
-                className="w-full max-w-[320px] rounded-xl border-2 border-foreground bg-white text-black p-5 flex flex-col items-center text-center shadow-md print:shadow-none print:border-2 print:border-black"
-              >
-                <div className="text-[11px] font-bold tracking-widest uppercase text-neutral-600 mb-0.5">
-                  {tenantName}
-                </div>
-                <div className="text-2xl font-black tracking-tight text-black mb-1">
-                  {selectedMachine.code}
-                </div>
-                <div className="text-xs font-semibold text-neutral-800 line-clamp-1 mb-3">
-                  {selectedMachine.name}
-                </div>
-
-                {/* SVG QR Code */}
-                <div
-                  className="size-48 p-2 bg-white rounded-lg border border-neutral-300 flex items-center justify-center"
-                  dangerouslySetInnerHTML={{ __html: qrSvgXml }}
-                />
-
-                <div className="text-[10px] text-neutral-500 font-mono mt-3">
-                  {selectedMachine.model ? `Modelo: ${selectedMachine.model}` : ""}
-                  {selectedMachine.serialNumber ? ` · S/N: ${selectedMachine.serialNumber}` : ""}
-                </div>
-
-                <div className="text-[9px] text-neutral-400 font-mono mt-1 tracking-tight break-all">
-                  Escanea para iniciar checklist previo al uso
-                </div>
-              </div>
-
-              {/* URL Display */}
-              <div className="w-full text-center print:hidden">
-                <span className="text-[11px] text-muted-foreground font-mono break-all">
-                  {qrUrl}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="flex flex-row justify-between items-center sm:justify-between print:hidden pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLink}
-              className="gap-1.5 text-xs"
-            >
-              {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
-              <span>{copied ? "¡Enlace copiado!" : "Copiar enlace"}</span>
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setQrModalOpen(false)}>
-                Cerrar
-              </Button>
-              <Button type="button" size="sm" onClick={handlePrint} className="gap-1.5">
-                <Printer className="size-3.5" />
-                <span>Imprimir etiqueta</span>
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* QR Code Industrial Card Modal */}
+      <CncQrCardModal
+        open={qrModalOpen}
+        onOpenChange={setQrModalOpen}
+        machine={selectedMachine}
+        slug={slug}
+        tenantName={tenantName}
+        logoUrl={logoUrl}
+      />
     </>
   );
 }
