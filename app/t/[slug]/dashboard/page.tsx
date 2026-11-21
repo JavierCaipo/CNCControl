@@ -83,6 +83,11 @@ export default function TenantDashboardPage() {
   const [summary, setSummary] = React.useState<AnalyticsSummary | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [reloadTrigger, setReloadTrigger] = React.useState(0);
+  const isClient = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // 1. Cargar datos del inquilino y lista de máquinas
   React.useEffect(() => {
@@ -310,7 +315,10 @@ export default function TenantDashboardPage() {
       <div className="hidden print:block p-6 border-b border-black">
         <h1 className="text-xl font-bold">Reporte de Control Operativo · {tenantName}</h1>
         <p className="text-xs text-gray-600">
-          Rango evaluado: Últimos {rangeDays} días · Generado: {new Date().toLocaleString("es-PE")}
+          Rango evaluado: Últimos {rangeDays} días · Generado:{" "}
+          <span suppressHydrationWarning>
+            {isClient ? new Date().toLocaleString("es-PE") : ""}
+          </span>
         </p>
       </div>
 

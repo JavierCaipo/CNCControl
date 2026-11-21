@@ -25,7 +25,8 @@ test('QR code generator outputs valid matrix and svg', () => {
 });
 
 test('preventive checklist state lifecycle and verification rules', () => {
-  const inspection = newInspection(new Date('2026-11-20T12:00:00Z'));
+  const testDate = new Date();
+  const inspection = newInspection(testDate);
   assert.equal(CHECKS.length, 14, 'Checklist should contain 14 standard checks');
 
   let status = getStatus(inspection);

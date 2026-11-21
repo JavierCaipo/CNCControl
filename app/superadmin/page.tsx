@@ -635,7 +635,7 @@ export default function SuperAdminPage() {
                       <TableRow key={tenant.id} className="border-border hover:bg-muted/30">
                         <TableCell>
                           <div className="font-semibold">{tenant.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground" suppressHydrationWarning>
                             Creado: {new Date(tenant.createdAt).toLocaleDateString("es-ES")}
                           </div>
                         </TableCell>
